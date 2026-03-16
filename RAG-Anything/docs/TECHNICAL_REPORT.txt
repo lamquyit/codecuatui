@@ -1,0 +1,74 @@
+# Tài Liệu Kỹ Thuật: Hệ Thống Thống Kê Thời Gian Xử Lý RAG
+
+## 1. Mục Tiêu (Goal)
+Nâng cấp hệ thống RAG từ việc chỉ hiển thị tổng thời gian xử lý ("Black Box") sang hiển thị chi tiết từng mili-giây cho mỗi giai đoạn ("Glass Box"). Đặc biệt tập trung vào việc đo lường hiệu năng của các tác vụ đa phương thức (Multimodal) phức tạp để phát hiện điểm nghẽn (bottleneck).
+
+## 2. Kiến Trúc Thay Đổi (System Architecture)
+Hệ thống đo lường hoạt động dựa trên luồng dữ liệu đi qua 3 tầng chính:
+
+**Tầng 1: Thu Thập (Processor Layer)**
+*   **File**: `RAG-Anything/raganything/processor.py`
+*   **Vai trò**: Gắn các "cảm biến" (Time Counters) trực tiếp vào code xử lý.
+*   **Thay đổi**:
+    *   Sử dụng `time.perf_counter()` để đo chính xác thời gian CPU/IO.
+    *   Chia nhỏ hàm `process_document` thành các block đo lường.
+    *   Lưu trữ kết quả tạm thời vào biến `self._last_stats`.
+
+**Tầng 2: Vận Chuyển (Service Layer)**
+*   **File**: `rag_service.py`
+*   **Vai trò**: Cầu nối vận chuyển dữ liệu từ lõi RAG ra ngoài giao diện.
+*   **Thay đổi**:
+    *   Hàm `process_document` lấy trực tiếp `_last_stats` từ tầng 1.
+    *   Map dữ liệu từ cấu trúc phức tạp (`{'stage': '...', 'duration': 10}`) sang cấu trúc phẳng (`key: value`).
+    *   **Fix quan trọng**: Đảm bảo copy đầy đủ các trường dữ liệu con (Description, Embedding...) thay vì chỉ copy tổng số.
+
+**Tầng 3: Báo Cáo (Reporting Layer)**
+*   **File**: `processed_util.py`
+*   **Vai trò**: Tổng hợp, tính toán trung bình và hiển thị.
+*   **Thay đổi**:
+    *   Hàm `generate_summary_report`: Cộng dồn số liệu để tính trung bình.
+    *   Hàm `format_single_file_report`: Render báo cáo text chi tiết theo cấu trúc phân cấp (Hierarchy).
+
+## 3. Luồng Dữ Liệu (Code Flow)
+
+Khi một file được upload và xử lý, dữ liệu sẽ đi theo quy trình sau:
+
+1.  **Start**: `rag_service.py` gọi `process_document_complete`.
+2.  **Phase 1 - MinerU Parsing**:
+    *   Processor gọi MinerU để parse PDF/Image.
+    *   -> Đo `mineru_parsing_time`.
+3.  **Phase 2 - Text Indexing**:
+    *   Processor tách văn bản thuần và gọi `lightrag.ainsert`.
+    *   -> Đo `text_indexing_time`.
+4.  **Phase 3 - Multimodal Processing**:
+    *   **3.1 Description Gen**: Gọi Vision LLM (GPT-4o) để mô tả ảnh. -> Đo `multimodal_description_time`.
+    *   **3.2 Embedding & Store**: Vector hóa mô tả và lưu vào DB. -> Đo `multimodal_embedding_time`.
+    *   **3.3 Entity Extraction**: Rút trích entity từ mô tả. -> Đo `multimodal_extraction_time`.
+    *   **3.4 Graph Merging**: Hòa trộn node ảnh vào đồ thị chính. -> Đo `crossmodal_graph_merging_time`.
+    *   -> Tổng hợp lại thành `multimodal_processing_time`.
+5.  **Return**: `processor.py` trả về `_last_stats`.
+6.  **Transport**: `rag_service.py` nhận `_last_stats`, merge vào biến `metrics`.
+7.  **Finalize**: `processed_util.py` nhận `metrics`, lưu vào JSON và sinh file `report_summary.txt`.
+
+## 4. Các Chỉ Số Cốt Lõi (Core Metrics)
+
+Sau khi nâng cấp, hệ thống cung cấp các chỉ số sau:
+
+*   **MinerU Parsing**: Thời gian để "đọc hiểu" cấu trúc file gốc.
+*   **Text Indexing**: Thời gian xử lý phần văn bản thuần túy.
+*   **Multimodal Processing** (Tổng):
+    *   `Description Gen`: Thời gian đợi AI "nhìn" và mô tả ảnh (Thường chiếm nhiều nhất - Network/LLM Latency).
+    *   `Embedding & Store`: Thời gian ghi dữ liệu xuống ổ cứng/DB (IO Disk).
+    *   `Entity Extraction`: Thời gian AI phân tích ngữ nghĩa của mô tả ảnh.
+    *   `Graph Merging`: Thời gian thuật toán xây dựng mối quan hệ đồ thị.
+
+## 5. Các Vấn Đề Đã Giải Quyết (Bug Fixes)
+
+1.  **Lỗi hiển thị 0s (Zero Stats)**:
+    *   Nguyên nhân: Logic merge ở `rag_service.py` bị thiếu các key mới.
+    *   Khắc phục: Bổ sung mapping đầy đủ cho 4 chỉ số con của Multimodal.
+2.  **Lỗi Fallback Mode**:
+    *   Nguyên nhân: Khi xử lý Batch bị lỗi, hệ thống chuyển sang xử lý tuần tự (Individual) nhưng chưa gắn bộ đếm.
+    *   Khắc phục: Đã gắn thêm đo đạc vào hàm `_process_multimodal_content_individual`.
+3.  **Dọn dẹp Overhead**:
+    *   Loại bỏ chỉ số "Merging/Graph Overhead" gây nhiễu và không chính xác, giúp báo cáo sạch sẽ hơn.

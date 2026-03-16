@@ -17,8 +17,8 @@ class Settings:
     LLM_BASE_URL: str = os.getenv("OPENAI_API_BASE_URL", "https://openrouter.ai/api/v1")
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
 
-    # ── RAG Base ─────────────────────────────────────────────
-    RAG_BASE_PATH: Path = Path(os.getenv("RAG_BASE_PATH", str(Path(__file__).parent.parent / "RAG_base")))
+    # ── Workspace ─────────────────────────────────────────────
+    WORKSPACE_DIR: Path = Path(os.getenv("WORKSPACE_DIR", str(Path(__file__).parent)))
 
     # ── Agentic Thresholds ───────────────────────────────────
     GROUNDEDNESS_THRESHOLD: float = float(os.getenv("GROUNDEDNESS_THRESHOLD", "0.7"))

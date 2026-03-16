@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "filename": "5a7a33205542996a35c1712f.txt",
+      "path": "/home/lamquy/Project/RAG/RAG_upgrade/input/hotpot/5a7a33205542996a35c1712f.txt",
+      "doc_id": "ea6cc8882044cd1028534662f8b94030",
+      "processed_at": "2026-03-16T18:30:54",
+      "processing_time_sec": 0.1,
+      "file_size_mb": 0.01,
+      "details": {
+        "content_blocks": null,
+        "mineru_parsing_time": {
+          "stage": "mineru_parsing",
+          "duration_sec": 0.0
+        },
+        "content_analysis_time": {
+          "stage": "content_analysis",
+          "duration_sec": 0.0
+        },
+        "rag_stats": {
+          "chunks": 0,
+          "entities": 0,
+          "relations": 0
+        },
+        "multimodal_description_time": {
+          "stage": "multimodal_description",
+          "duration_sec": 0.0
+        },
+        "multimodal_embedding_time": {
+          "stage": "multimodal_embedding",
+          "duration_sec": 0.0
+        },
+        "multimodal_extraction_time": {
+          "stage": "multimodal_extraction",
+          "duration_sec": 0.0
+        },
+        "crossmodal_graph_merging_time": {
+          "stage": "crossmodal_graph_merging",
+          "duration_sec": 0.0
+        }
+      }
+    }
+  ]
+}

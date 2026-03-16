@@ -16,16 +16,11 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# ── Make RAG_base importable ────────────────────────────────
-_rag_base = settings.RAG_BASE_PATH
-if str(_rag_base) not in sys.path:
-    sys.path.insert(0, str(_rag_base))
-# Also need RAG-Anything on the path (RAG_base does this internally too)
-_rag_anything_path = _rag_base / "RAG-Anything"
-if str(_rag_anything_path) not in sys.path:
-    sys.path.insert(0, str(_rag_anything_path))
+# ── Workspace Configuration ─────────────────────────────────────
+_workspace = settings.WORKSPACE_DIR
 
-from rag_service import RAGService  # noqa: E402
+from rag_service import RAGService
+
 
 # ── Singleton ───────────────────────────────────────────────
 _service: RAGService | None = None
@@ -34,7 +29,7 @@ _service: RAGService | None = None
 def get_rag_service() -> RAGService:
     global _service
     if _service is None:
-        _service = RAGService(_rag_base)
+        _service = RAGService(_workspace)
     return _service
 
 
@@ -72,8 +67,8 @@ def calculate_md5_bytes(file_bytes: bytes) -> str:
 
 
 def load_processed_metadata() -> dict[str, Any]:
-    """Load processed_files.json from RAG_base."""
-    meta_path = _rag_base / "processed_files.json"
+    """Load processed_files.json from Workspace."""
+    meta_path = _workspace / "processed_files.json"
     if meta_path.exists():
         with open(meta_path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -93,7 +88,7 @@ def process_document(
         doc_id (MD5 hash of the file content)
     """
     svc = get_rag_service()
-    output_dir = _rag_base / "output_for_report"
+    output_dir = _workspace / "output_for_report"
     svc.process_document(
         file_path,
         str(output_dir),
@@ -105,8 +100,8 @@ def process_document(
 
 
 def get_input_dir() -> Path:
-    """Return the input directory for uploaded files (inside RAG_base)."""
-    d = _rag_base / "input"
+    """Return the input directory for uploaded files."""
+    d = _workspace / "input"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -114,7 +109,7 @@ def get_input_dir() -> Path:
 # ── Graph structure access ──────────────────────────────────
 
 def _storage_dir() -> Path:
-    return _rag_base / "rag_storage"
+    return _workspace / "rag_storage"
 
 
 def load_graph_structure() -> dict[str, Any]:
